@@ -1,7 +1,9 @@
-# TRSP KR-3
+# TRSP KR-3 / KR-4
 
-Контрольная работа №3 по дисциплине «Технологии разработки серверных приложений».  
-Задания 6.1–8.2: HTTP Basic аутентификация, JWT, RBAC, SQLite CRUD.
+Контрольные работы №3-4 по дисциплине «Технологии разработки серверных приложений».
+
+- **KR-3** (задания 6.1-8.2): HTTP Basic аутентификация, JWT, RBAC, SQLite CRUD
+- **KR-4** (задания 9.1-11.2): Alembic-миграции, обработка ошибок, валидация, тестирование
 
 ## Установка и запуск
 
@@ -19,7 +21,7 @@ python -m venv .venv
 # Установить зависимости
 pip install -r requirements.txt
 
-# Скопировать .env.example → .env и при необходимости изменить значения
+# Скопировать .env.example -> .env
 copy .env.example .env
 
 # Запустить приложение
@@ -40,17 +42,44 @@ uvicorn main:app --reload
 | `DOCS_PASSWORD`        | Пароль для доступа к /docs (DEV)               | `admin`                |
 | `JWT_EXPIRATION_MINUTES` | Время жизни JWT-токена (мин)                 | `30`                   |
 
+## Alembic-миграции (задание 9.1)
+
+```bash
+# Инициализация уже выполнена. Для применения миграций:
+alembic upgrade head
+
+# Для создания новой миграции после изменения моделей:
+alembic revision --autogenerate -m "описание изменений"
+```
+
+Миграции находятся в `alembic/versions/`. Создано две миграции:
+1. Создание таблицы `products` (id, title, price, count)
+2. Добавление поля `description` (NOT NULL)
+
+## Запуск тестов (задания 11.1-11.2)
+
+```bash
+# Запуск всех тестов
+python -m pytest tests/ -v
+
+# Только синхронные тесты (11.1)
+python -m pytest tests/test_endpoints.py -v
+
+# Только асинхронные тесты (11.2)
+python -m pytest tests/test_async_users.py -v
+```
+
 ## Тестирование эндпоинтов (curl)
 
-### Задание 6.1–6.2: HTTP Basic Auth
+### Задание 6.1-6.2: HTTP Basic Auth
 
 ```bash
 # Регистрация
 curl -X POST -H "Content-Type: application/json" \
-  -d "{\"username\":\"user1\",\"password\":\"correctpass\"}" \
+  -d '{"username":"user1","password":"correctpass"}' \
   http://localhost:8000/basic/register
 
-# Успешный логин (HTTP Basic)
+# Логин (HTTP Basic)
 curl -u user1:correctpass http://localhost:8000/basic/login
 
 # Неверный пароль
@@ -60,32 +89,28 @@ curl -u user1:wrongpass http://localhost:8000/basic/login
 ### Задание 6.3: Документация DEV/PROD
 
 ```bash
-# DEV-режим: доступ к документации с аутентификацией
+# DEV: доступ к документации с аутентификацией
 curl -u admin:admin http://localhost:8000/docs
 
-# Без аутентификации — 401
-curl http://localhost:8000/docs
-
-# PROD-режим (MODE=PROD в .env): 404
+# PROD (MODE=PROD в .env): 404
 curl http://localhost:8000/docs
 ```
 
-### Задание 6.4–6.5: JWT Auth
+### Задание 6.4-6.5: JWT Auth
 
 ```bash
 # Регистрация
 curl -X POST -H "Content-Type: application/json" \
-  -d "{\"username\":\"alice\",\"password\":\"qwerty123\"}" \
+  -d '{"username":"alice","password":"qwerty123"}' \
   http://localhost:8000/jwt/register
 
-# Логин — получение токена
+# Логин
 curl -X POST -H "Content-Type: application/json" \
-  -d "{\"username\":\"alice\",\"password\":\"qwerty123\"}" \
+  -d '{"username":"alice","password":"qwerty123"}' \
   http://localhost:8000/jwt/login
 
-# Доступ к защищённому ресурсу (подставить полученный токен)
-curl -H "Authorization: Bearer <TOKEN>" \
-  http://localhost:8000/jwt/protected_resource
+# Защищённый ресурс
+curl -H "Authorization: Bearer <TOKEN>" http://localhost:8000/jwt/protected_resource
 ```
 
 ### Задание 7.1: RBAC
@@ -93,58 +118,71 @@ curl -H "Authorization: Bearer <TOKEN>" \
 ```bash
 # Регистрация с ролью admin
 curl -X POST -H "Content-Type: application/json" \
-  -d "{\"username\":\"admin1\",\"password\":\"pass\",\"role\":\"admin\"}" \
+  -d '{"username":"admin1","password":"pass","role":"admin"}' \
   http://localhost:8000/rbac/register
 
 # Логин
 curl -X POST -H "Content-Type: application/json" \
-  -d "{\"username\":\"admin1\",\"password\":\"pass\",\"role\":\"admin\"}" \
+  -d '{"username":"admin1","password":"pass","role":"admin"}' \
   http://localhost:8000/rbac/login
 
-# Создание ресурса (admin)
-curl -X POST -H "Authorization: Bearer <TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d "{\"name\":\"Resource 1\"}" \
-  http://localhost:8000/rbac/resource
-
-# Чтение ресурсов (admin, user, guest)
+# CRUD-операции с ресурсами (подставить токен)
+curl -X POST -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" \
+  -d '{"name":"Resource 1"}' http://localhost:8000/rbac/resource
 curl -H "Authorization: Bearer <TOKEN>" http://localhost:8000/rbac/resource
-
-# Обновление (admin, user)
-curl -X PUT -H "Authorization: Bearer <TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d "{\"name\":\"Updated\"}" \
-  http://localhost:8000/rbac/resource/1
-
-# Удаление (только admin)
-curl -X DELETE -H "Authorization: Bearer <TOKEN>" \
-  http://localhost:8000/rbac/resource/1
 ```
 
-### Задание 8.1: SQLite — регистрация пользователей
+### Задание 8.1-8.2: SQLite
 
 ```bash
+# Регистрация в SQLite
 curl -X POST -H "Content-Type: application/json" \
-  -d "{\"username\":\"test_user\",\"password\":\"12345\"}" \
+  -d '{"username":"test_user","password":"12345"}' \
   http://localhost:8000/db/register
+
+# Todo CRUD
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"title":"Buy groceries","description":"Milk, eggs"}' \
+  http://localhost:8000/todos
+curl http://localhost:8000/todos/1
+curl -X PUT -H "Content-Type: application/json" \
+  -d '{"title":"Buy groceries","description":"Milk, eggs, bread","completed":true}' \
+  http://localhost:8000/todos/1
+curl -X DELETE http://localhost:8000/todos/1
 ```
 
-### Задание 8.2: SQLite — CRUD Todo
+### Задание 10.1: Пользовательские ошибки
 
 ```bash
-# Создать Todo
+# Получить существующий товар
+curl http://localhost:8000/errors/items/1
+
+# Товар не найден (CustomExceptionB -> 404)
+curl http://localhost:8000/errors/items/999
+
+# Покупка с недостаточным запасом (CustomExceptionA -> 400)
+curl -X POST "http://localhost:8000/errors/items/2/purchase?quantity=1"
+```
+
+### Задание 10.2: Валидация данных
+
+```bash
+# Валидные данные
 curl -X POST -H "Content-Type: application/json" \
-  -d "{\"title\":\"Buy groceries\",\"description\":\"Milk, eggs, bread\"}" \
-  http://localhost:8000/todos
+  -d '{"username":"test","age":25,"email":"test@mail.com","password":"securepass1"}' \
+  http://localhost:8000/validate/user
 
-# Получить Todo по ID
-curl http://localhost:8000/todos/1
+# Невалидный возраст (<=18)
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"username":"test","age":17,"email":"test@mail.com","password":"securepass1"}' \
+  http://localhost:8000/validate/user
+```
 
-# Обновить Todo
-curl -X PUT -H "Content-Type: application/json" \
-  -d "{\"title\":\"Buy groceries\",\"description\":\"Milk, eggs, bread, butter\",\"completed\":true}" \
-  http://localhost:8000/todos/1
+### Задание 11.1-11.2: Users CRUD (для тестов)
 
-# Удалить Todo
-curl -X DELETE http://localhost:8000/todos/1
+```bash
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"username":"alice","age":25}' http://localhost:8000/users
+curl http://localhost:8000/users/1
+curl -X DELETE http://localhost:8000/users/1
 ```
